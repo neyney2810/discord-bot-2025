@@ -1,4 +1,5 @@
-import { SlashCommandBuilder, CommandInteraction, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder } from '@discordjs/builders';
+import { CommandInteraction, EmbedBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { Command } from '../types/Command';
 import { DatabaseService } from '../services/DatabaseService';
 
@@ -8,12 +9,14 @@ export const leaderboard: Command = {
   data: new SlashCommandBuilder()
     .setName('leaderboard')
     .setDescription('Show the quiz leaderboard for this server')
-    .addIntegerOption(option =>
-      option.setName('limit')
-        .setDescription('Number of users to show (default: 10)')
-        .setMinValue(1)
-        .setMaxValue(25)
-    ),
+    // .addIntegerOption(option =>
+    //   option.setName('limit')
+    //     .setDescription('Number of top users to show (default: 10)')
+    //     .setMinValue(1)
+    //     .setMaxValue(100)
+    //     .setRequired(false)
+    // )
+    ,
   
   async execute(interaction: CommandInteraction) {
     try {
@@ -24,7 +27,7 @@ export const leaderboard: Command = {
         return;
       }
 
-      const limit = interaction.options.get('limit')?.value as number || 10;
+      const limit = (interaction as ChatInputCommandInteraction).options.getInteger('limit') || 10;
       const leaderboard = await databaseService.getLeaderboard(interaction.guildId, limit);
 
       if (leaderboard.length === 0) {

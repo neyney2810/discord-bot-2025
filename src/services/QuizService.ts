@@ -5,8 +5,8 @@ import {
   ActionRowBuilder, 
   ButtonBuilder, 
   ButtonStyle,
-  ComponentType,
-  ButtonInteraction
+  ButtonInteraction,
+  Message
 } from 'discord.js';
 import { DatabaseService } from './DatabaseService';
 import { Quiz } from '../types/Quiz';
@@ -26,34 +26,51 @@ export class QuizService {
     try {
       const quiz = await this.databaseService.getRandomQuiz();
       if (!quiz) {
-        await channel.send('❌ No quizzes available at the moment!');
+        if ('send' in channel) {
+          await channel.send('❌ No quizzes available at the moment!');
+        }
         return;
       }
 
       const embed = this.createQuizEmbed(quiz);
       const actionRow = this.createQuizButtons(quiz);
 
-      const message = await channel.send({
-        embeds: [embed],
-        components: [actionRow]
-      });
+      let message: Message<false> | Message<true> | undefined;
+      if ('send' in channel) {
+        message = await channel.send({
+          embeds: [embed],
+          components: [actionRow]
+        });
+      }
 
       // Store active quiz
-      const quizKey = `${channel.guildId}-${message.id}`;
-      this.activeQuizzes.set(quizKey, {
-        quiz,
-        responses: new Set()
-      });
+      if (message) {
+        const quizKey = channel.isDMBased() ? `dm-${message.id}` : `${channel.guildId}-${message.id}`;
+        this.activeQuizzes.set(quizKey, {
+          quiz,
+          responses: new Set()
+        });
+
+        // Set timeout for quiz
+        const timeoutMinutes = parseInt(process.env.QUIZ_TIMEOUT_MINUTES || '5');
+        setTimeout(async () => {
+          await this.endQuiz(message!.id, channel);
+        }, timeoutMinutes * 60 * 1000);
+      }
 
       // Set timeout for quiz
       const timeoutMinutes = parseInt(process.env.QUIZ_TIMEOUT_MINUTES || '5');
       setTimeout(async () => {
-        await this.endQuiz(message.id, channel);
+        if (message) {
+          await this.endQuiz(message.id, channel);
+        }
       }, timeoutMinutes * 60 * 1000);
 
     } catch (error) {
       logger.error('Error sending daily quiz:', error);
-      await channel.send('❌ An error occurred while sending the quiz. Please try again later.');
+      if ('send' in channel) {
+        await channel.send('❌ An error occurred while sending the quiz. Please try again later.');
+      }
     }
   }
 
@@ -160,13 +177,14 @@ export class QuizService {
 
   private async endQuiz(messageId: string, channel: TextBasedChannel): Promise<void> {
     try {
-      const quizKey = `${channel.guildId}-${messageId}`;
+      const quizKey = channel.isDMBased() ? `dm-${messageId}` : `${channel.guildId}-${messageId}`;
       const activeQuiz = this.activeQuizzes.get(quizKey);
 
       if (!activeQuiz) return;
 
       const quiz = activeQuiz.quiz;
-      const responses = await this.databaseService.getQuizResponses(quiz.id, channel.guildId!);
+      const guildId = channel.isDMBased() ? null : channel.guild?.id;
+      const responses = await this.databaseService.getQuizResponses(quiz.id, guildId!);
 
       const resultsEmbed = new EmbedBuilder()
         .setTitle('📊 Quiz Results')
@@ -183,7 +201,9 @@ export class QuizService {
         resultsEmbed.addFields({ name: '💡 Explanation', value: quiz.explanation });
       }
 
-      await channel.send({ embeds: [resultsEmbed] });
+      if ('send' in channel) {
+        await channel.send({ embeds: [resultsEmbed] });
+      }
 
       // Clean up
       this.activeQuizzes.delete(quizKey);

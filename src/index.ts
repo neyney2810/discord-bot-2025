@@ -1,14 +1,13 @@
-import { Client, GatewayIntentBits, Collection } from 'discord.js';
 import { config } from 'dotenv';
+config(); // Load environment variables
+
+import { Client, GatewayIntentBits, Collection } from 'discord.js';
 import { logger } from './utils/logger';
-import { DatabaseService } from './services/DatabaseService';
 import { QuizScheduler } from './services/QuizScheduler';
 import { loadCommands } from './utils/commandLoader';
 import { loadEvents } from './utils/eventLoader';
 import { Command } from './types/Command';
-
-// Load environment variables
-config();
+import { DatabaseService } from './services/DatabaseService';
 
 class QuizBot {
   public client: Client;
@@ -33,22 +32,17 @@ class QuizBot {
 
   public async start(): Promise<void> {
     try {
-      // Initialize database
       await this.databaseService.initialize();
       logger.info('Database initialized successfully');
 
-      // Load commands and events
       await loadCommands(this.client, this.commands);
       await loadEvents(this.client, this.databaseService);
-      
-      // Login to Discord
+
       await this.client.login(process.env.DISCORD_TOKEN);
       logger.info('Bot logged in successfully');
 
-      // Start quiz scheduler
       this.quizScheduler.start();
       logger.info('Quiz scheduler started');
-
     } catch (error) {
       logger.error('Failed to start bot:', error);
       process.exit(1);
@@ -56,11 +50,9 @@ class QuizBot {
   }
 }
 
-// Start the bot
 const bot = new QuizBot();
 bot.start();
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   logger.info('Shutting down bot...');
   bot.client.destroy();

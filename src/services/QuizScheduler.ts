@@ -1,7 +1,7 @@
 import { Client } from 'discord.js';
-import * as cron from 'node-cron';
-import * as moment from 'moment-timezone';
-import { DatabaseService } from './DatabaseService';
+import cron from 'node-cron';
+import moment from 'moment-timezone';
+import { DatabaseService } from '../services/DatabaseService';
 import { QuizService } from './QuizService';
 import { logger } from '../utils/logger';
 
